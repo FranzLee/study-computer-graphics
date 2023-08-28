@@ -6,28 +6,47 @@
 canvas {
     border: 1px solid #d3d3d3;
     background-color: #f1f1f1;
+} 
+.styleTopic {
+    color: rgba(153,153,255,1);
+    font-size: xx-large;
+    font-weight: bold;
+}
+
+ .styleText {
+    color: rgba(153, 153, 255, 1);
+    font-size: medium;
 }
 </style>
 </head>
 <body onload="startGame()">
 <script>
 var player;
+var scores = 0;
+var levels = 0;
 var debug = -1;
+var direction = 0;
+var obstacle = [];
+var obstacleCenter = 270;
+var obstacleGap = 80;
 
 function startGame() {
     myGameArea.start();
-    player = new conponent(100, 100, 50, 0, 2 * Math.PI, "DeepSkyBlue", 200, 20, 800, 200, 480, 270, 40, 40)
+    player = new conponent("DeepSkyBlue", 480, 270, 40, 40)
 }
 
 var myGameArea = {
-    key : false, 
+    key : false,
     canvas : document.createElement("canvas"),
     start : function() {
         this.canvas.width = 960;
         this.canvas.height = 540;
         this.context = this.canvas.getContext("2d");
         document.body.insertBefore(this.canvas, document.body.childNodes[0]);
+        this.frame = 0
         this.interval = setInterval(updateGameArea, 20);
+        this.obstacleSpeed = 1
+        this.newObstacle = 150
 
         var self = this;
         window.addEventListener('keydown', function(e) {
@@ -37,56 +56,107 @@ var myGameArea = {
         });
         window.addEventListener('keyup', function (e) {
             self.key = false;
+            slowdown();
         });
     }, 
     clear : function() {
         this.context.clearRect(0, 0, this.canvas.width, this.canvas.height)
+    },
+    stop : function() {
+        clearInterval(this.interval)
     }
 }
 
-function conponent(x, y, r, sAngle, eAngle, color, x1, y1, x2, y2, x3, y3, weight, height){
+function conponent(color, x, y, weight, height, type, time){
+    this.color = color;
+    this.type = type
     this.x = x;
     this.y = y;
-    this.r = r;
-    this.sAngle = sAngle;
-    this.eAngle = eAngle;
-    this.color = color;
-    this.x1 = x1;
-    this.y1 = y1;
-    this.x2 = x2;
-    this.y2 = y2;
-    this.x3 = x3;
-    this.y3 = y3;
     this.weight = weight;
     this.height = height;
     this.speedX = 0;
     this.speedY = 0;
-    this.speedFactor = 0.5;
+    this.speedFactor = 0.2;
     this.update = function() {
-        myGameArea.context.fillStyle = color;
-        myGameArea.context.fillRect(this.x3, this.y3, this.weight, this.height)
-        myGameArea.context.beginPath();
-        myGameArea.context.arc(this.x, this.y, this.r, this.sAngle, this.eAngle);
-        myGameArea.context.moveTo(this.x1, this.y1)
-        myGameArea.context.lineTo(this.x2, this.y2)
-        myGameArea.context.stroke();
-        myGameArea.context.fill();
+        if (this.type == "text") {
+            myGameArea.context.font = this.weight + "" + this.height;
+            myGameArea.context.fillStyle = this.color;
+            myGameArea.context.fillText(this.text, this.x, this.y);
+        }
+        myGameArea.context.fillStyle = this.color;
+        myGameArea.context.fillRect(this.x, this.y, this.weight, this.height);
     }
-    this.moving = function() {
-        player.x3 = player.x3 + player.speedX
-        player.y3 = player.y3 + player.speedY
+    this.updatelocation = function() {
+        player.x = player.x + player.speedX;
+        player.y = player.y + player.speedY;
+    }
+    this.detectObjectCollision = function(things) {
+        var objectTop = this.y
+        var objectLeft = this.x
+        var objectRight = this.x + this.weight
+        var objectBottom = this.y + this.height
+        var thingsTop = things.y
+        var thingsLeft = things.x
+        var thingsRight = things.x + things.weight
+        var thingsBottom = things.y + things.height
+        var result = true
+        if ((thingsTop > objectBottom) || (thingsBottom < objectTop) || (thingsLeft > objectRight) || (thingsRight < objectLeft)) {
+            result = false
+        }
+        return result 
     }
 }
 
 function updateGameArea() {
-    if (myGameArea.key && myGameArea.key == 'ArrowLeft') { moveLeft(); }
-    if (myGameArea.key && myGameArea.key == 'ArrowRight') { moveRight(); }
-    if (myGameArea.key && myGameArea.key == 'ArrowDown') { moveDown(); }
-    if (myGameArea.key && myGameArea.key == 'ArrowUp') { moveUp(); }
+    if (myGameArea.key && myGameArea.key == 'ArrowLeft') { leftholding(); }
+    if (myGameArea.key && myGameArea.key == 'ArrowRight') { rightholding(); }
+    if (myGameArea.key && myGameArea.key == 'ArrowDown') { downholding(); }
+    if (myGameArea.key && myGameArea.key == 'ArrowUp') { upholding(); }
     
+    for (i = 0; i < obstacle.length; i += 1) {
+        if (player.detectObjectCollision(obstacle[i])) {
+            myGameArea.stop();
+            return;
+        }
+    };
     myGameArea.clear();
+    if (myGameArea.frame == 0 || everyFrame(myGameArea.newObstacle)) {
+        var x = myGameArea.canvas.width;
+        var y;
+        console.log('center:', obstacleCenter);
+        console.log('gap:', obstacleGap);
+        obstacleCenter = obstacleCenter + getRandom(300) - 150;
+        if (obstacleCenter > 460) {
+            obstacleCenter = 500;
+        }
+        else if (obstacleCenter < 80) {
+            obstacleCenter = 40;
+        }
+        obstacleGap = getRandom(20) + 80;
+        y = obstacleCenter + (obstacleGap / 2);
+        obstacle.push(new conponent("Gold", x, y, 10, 515));
+        y = obstacleCenter - (obstacleGap / 2) - 515;
+        obstacle.push(new conponent("Gold", x, y, 10, 515));
+        console.log('center2:', obstacleCenter);
+        console.log('gap2:', obstacleGap);
+    }
+    if (everyFrame(500)) {
+        myGameArea.obstacleSpeed = myGameArea.obstacleSpeed * 1.5;
+        myGameArea.newObstacle = Math.round(myGameArea.newObstacle * 0.8 + 1);
+        levels += 1
+    }
+    for (i = 0; i < obstacle.length; ++i) {
+        obstacle[i].x -= myGameArea.obstacleSpeed;
+        obstacle[i].update();
+    }
+    myGameArea.frame += 1;
+    moving();
+    player.updatelocation();
     player.update();
-    player.moving();
+    scores += 1;
+    scores += player.x * 0.005;
+    document.getElementById("scores").innerHTML = 'Scores : ' + Math.round(scores);
+    document.getElementById("levels").innerHTML = 'Level : ' + levels
 }
 
 function moveUp() {
@@ -105,17 +175,114 @@ function moveRight() {
     player.speedX = player.speedX + player.speedFactor;
 }
 
-function stopMove() {
-    player.speedX = 0
-    player.speedY = 0
+
+function upholding(){
+    direction = 'up';
+}
+
+function leftholding(){
+    direction = 'left';
+}
+
+function rightholding(){
+    direction = 'right';
+}
+
+function downholding(){
+    direction = 'down';
+}
+
+function slowdown() {
+    if (!(player.speedX == 0)) {
+        direction = 'Xslowdown';
+    }
+    else if (!(player.speedY == 0)) {
+        direction = 'Yslowdown';
+    }
+}
+
+function Xslowfun () {
+        if (player.speedX > player.speedFactor && player.speedX > 0) {
+            player.speedX = player.speedX - player.speedFactor
+        }
+        else if (player.speedX <= player.speedFactor && player.speedX > 0) {
+            player.speedX = 0
+        }
+        else if (player.speedX < player.speedFactor && player.speedX < 0) {
+            player.speedX = player.speedX + player.speedFactor
+        }
+        else if ((player.speedX + player.speedFactor) >= 0 && player.speedX < 0) {
+            player.speedX = 0
+        };
+    }
+    function Yslowfun () {
+        if (player.speedY > player.speedFactor && player.speedY > 0) {
+            player.speedY = player.speedY - player.speedFactor
+        }
+        else if (player.speedY <= player.speedFactor && player.speedY > 0) {
+            player.speedY = 0
+        }
+        else if (player.speedY < player.speedFactor && player.speedY < 0) {
+            player.speedY = player.speedY + player.speedFactor
+        }
+        else if ((player.speedY + player.speedFactor) >= 0 && player.speedY < 0) {
+            player.speedY = 0
+        }
+    } 
+
+function moving (){
+    if (direction == 'up') {
+        moveUp();
+    }
+    else if (direction == 'left') {
+        moveLeft();
+    }
+    else if (direction == 'right') {
+        moveRight();
+    }
+    else if (direction == 'down') {
+        moveDown();
+    }
+    checkX();
+    checkY();
+
+    console.log(direction);
+}
+
+function checkX () {
+    if (!(player.speedX == 0) && !(direction == 'left') && !(direction == 'right')) {
+        Xslowfun();
+    }
+}
+
+function checkY () {
+    if (!(player.speedY == 0) && !(direction == 'up') && !(direction == 'down')) {
+        Yslowfun();
+    }
+}
+
+function everyFrame (n) {
+    if (myGameArea.frame % n == 0){
+        return true
+    }
+    else {
+        return false
+    }
+}
+
+function getRandom (x) {
+    return Math.floor(Math.random() * x) + 1;
 }
 
 </script>
 
-<button onclick="moveUp()">向上</button>
-<button onclick="moveDown()">向下</button>
-<button onclick="moveLeft()">向左</button>
-<button onclick="moveRight()">向右</button>
+<button onmousedown="upholding()" onmouseup="slowdown()" onmouseout="slowdown()">向上</button>
+<button onmousedown="leftholding()" onmouseup="slowdown()" onmouseout="slowdown()">向左</button>
+<button onmousedown="rightholding()" onmouseup="slowdown()" onmouseout="slowdown()">向右</button>
+<button onmousedown="downholding()" onmouseup="slowdown()" onmouseout="slowdown()">向下</button>
+<p class="styleText" id="leader">Use arrow keys or buttons to control</p>
+<p class="styleText" id="scores"></p>
+<p class="styleText" id="levels"></p>
 
 </body>
 </html>
